@@ -1,0 +1,964 @@
+---
+title: "Data cleaning and analysis"
+author: "Iris Zhong"
+date: "3/28/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(mosaic)
+#library(sjmisc)
+#library(jtools)
+library(patchwork)
+library(rstatix)
+
+```
+
+```{r read data}
+library(readxl)
+all_child <- read_excel("data_all_child.xlsx")
+
+
+#all_child <- read_csv("C:/Users/iris_/OneDrive/Desktop/Smith/Honor #thesis/data_all_child.csv")
+
+```
+
+# Predictions
+
+If child uses Rule (a): \
+
+LLRRLRLRRL
+
+
+If child uses Rule (b): \
+
+RRLLRLRRRL
+
+(L = select left, R = select right)
+
+
+# Data Cleaning
+
+## Remove incomplete/preview data
+
+```{r filter incomplete preview data}
+clean_child <- all_child %>%
+  filter(response__is_preview == F)
+
+clean_child %>%
+  filter(response__completed == F)
+
+clean_child <- clean_child %>%
+  filter(response__completed == T)
+```
+
+
+## Check children only choosing left/right
+
+```{r choose only left}
+all_child %>%
+  filter(item1 == "left" & item2 == "left" & item3 == "left" & item4 == "left" & item5 == "left" & item6 == "left" & item7 == "left" & item8 == "left" & item9 == "left" & item10 == "left")
+```
+
+```{r choose only right}
+all_child %>%
+  filter(item1 == "right" & item2 == "right" & item3 == "right" & item4 == "right" & item5 == "right" & item6 == "right" & item7 == "right" & item8 == "right" & item9 == "right" & item10 == "right")
+```
+
+35158, 36378, 36843, 33920
+
+
+## Remove child who did the test twice
+
+```{r did test twice}
+clean_child <- clean_child %>%
+  filter(response__id != 33970 & response__id != 38936)
+```
+
+
+## Check children who only chose boy/girl
+
+```{r only choose girl}
+clean_child %>%
+  filter(item2 == "right" & item3 == "right" & item5 == "right" & item7 == "left" & item9 == "right")
+```
+
+```{r only choose boy}
+clean_child %>%
+  filter(item2 == "left" & item3 == "left" & item5 == "left" & item7 == "right" & item9 == "left")
+```
+
+```{r remove left/right boy/girl}
+small_sample <- clean_child %>%
+  filter(response__id != 35158 & response__id != 36378 & response__id != 36843& response__id != 33920) %>%
+  filter (item2 != "right" | item3 != "right" | item5 != "right" | item7 != "left" | item9 != "right") %>%
+   filter(item2 != "left" | item3 != "left" | item5 != "left" | item7 != "right" | item9 != "left")
+  
+```
+
+
+## Remove child with significant birthdate difference
+
+```{r remove birth diff child}
+small_sample <- small_sample %>%
+  filter(response__id != 33339 & response__id != 40238)
+```
+
+
+
+# Final Sample Descriptive Statistics
+
+## Check age 
+
+```{r clean age}
+clean_child <- clean_child %>%
+  mutate(age = child__age_rounded / 365)
+
+small_sample <- small_sample %>%
+  mutate(age = child__age_rounded / 365)
+
+```
+
+
+```{r check age}
+favstats(clean_child$age)
+favstats(small_sample$age)
+```
+
+```{r group age}
+small_sample <- small_sample %>%
+  mutate(age_group = case_when(age < 5 ~ 1,
+                               age >=5 & age < 6 ~ 2,
+                               age >=6 & age < 7 ~ 3,
+                               age >= 7 ~ 4)) %>%
+  mutate(age_group = as.factor(age_group))
+```
+
+
+## Check balance
+
+```{r check balance}
+tally(small_sample$condition_id)
+tally(small_sample$age_group)
+```
+
+# Recoding
+
+LLRRLRLRRL
+RRLLRLRRRL
+
+
+```{r}
+small_sample_coded <- small_sample %>%
+  mutate(item1=recode(item1, 
+                         `left`="pi",
+                         `right`="ta"),
+         item2=recode(item2, 
+                         `left`="pi",
+                         `right`="ta"),
+         item3=recode(item3, 
+                         `left`="ta",
+                         `right`="pi"),
+         item4=recode(item4, 
+                         `left`="ta",
+                         `right`="pi"),
+         item5=recode(item5, 
+                         `left`="pi",
+                         `right`="ta"),
+         item6=recode(item6, 
+                         `left`="ta",
+                         `right`="pi"),
+          item7=recode(item7, 
+                         `left`="pi",
+                         `right`="ta"),
+         item8=recode(item8, 
+                         `left`="pi",
+                         `right`="ta"),
+         item9=recode(item9, 
+                         `left`="pi",
+                         `right`="ta"),
+         item10=recode(item10, 
+                         `left`="ta",
+                         `right`="ma")
+         ) %>%
+  mutate(condition_id = case_when(condition_id == "V0" ~ "2",
+                                  condition_id == "V1" ~ "1")) %>%
+  mutate(condition_id = as.factor(condition_id))
+
+small_sample_coded[37, 12] = NA # remove single cell value b/c of tech issue
+small_sample_coded[34, 12] = NA # remove single cell value b/c of tech issue
+```
+
+
+
+
+# Item 1 to 7
+
+## Predictions
+
+**Using Tolearnce Principle** \
+
+Rule (a): use pi all the time in item 1-7 \
+Rule (b): use ta all the time in item 1-7 \
+
+**Using Probability Matching** \
+
+If in Condition 1: use ta 57% of the time \
+If in Condition 2: use ta 74% of the time \
+
+
+**Choosing by chance** \
+
+Use ta about 50% of the time \
+
+## Select and Wrangle Item 1-7
+
+```{r select and wrangle 1-7}
+small_sample_AA <- small_sample_coded %>%
+  select(-c(item8,item9,item10))
+
+small_sample_AA$one_seven_ta_count <- apply(small_sample_AA, 1, function(x) length(which(x=="ta")))
+
+#small_sample_AA <- row_count(small_sample_AA, count = "ta", append = TRUE)
+small_sample_AA$NA_count <- rowSums(is.na(small_sample_AA))
+#small_sample_AA <- small_sample_AA %>%
+#  dplyr::rename(one_seven_ta_count = rowcount)
+
+small_sample_AA <- small_sample_AA %>%
+  mutate(ta_proportion = one_seven_ta_count/(7-NA_count)) %>%
+  mutate(pi_proportion = (7-NA_count-one_seven_ta_count)/(7-NA_count))
+```
+
+
+```{r, include = F}
+ggplot(small_sample_AA, aes(x = one_seven_ta_count, color = condition_id, fill = condition_id)) +
+  geom_histogram(position = "identity", alpha = 0.5)
+```
+
+```{r, include = F}
+ggplot(small_sample_AA) + geom_freqpoly(aes(x = one_seven_ta_count,
+     y = ..density.., colour = condition_id)) +
+  facet_wrap(~condition_id)
+
+```
+
+```{r,include = F}
+#summary_AA <- small_sample_AA %>%
+#  group_by(condition_id) %>%
+#  summarize(n = n(),
+#            average_proportion = mean(ta_proportion))
+```
+
+```{r,include = F}
+#ggplot(small_sample_AA, aes(x=age_group, y= ta_proportion, color = age_group)) + 
+#  geom_boxplot(outlier.colour="red", outlier.shape=8,
+#                outlier.size=4) +
+#  geom_jitter(shape=16, position=position_jitter(0.2))
+```
+
+## Number of people in each group
+
+```{r count people by age group*condition}
+small_sample_AA %>%
+  group_by(condition_id, age_group) %>%
+  summarize(n = n())
+
+#library("writexl")
+#write_xlsx(small_sample_AA,"item1_to_7.xlsx")
+```
+
+## Descrptive Stats
+
+```{r item1-7 descriptive}
+favstats(small_sample_AA$ta_proportion)
+favstats(ta_proportion~condition_id, data = small_sample_AA)
+favstats(data = small_sample_AA, ta_proportion~age_group)
+tally(small_sample_AA$age_group)
+
+```
+
+```{r}
+ggplot(small_sample_AA, aes(x = ta_proportion)) +
+  geom_bar()
+```
+
+```{r item 1-7 demo}
+young_AA <- small_sample_AA %>%
+  filter(age<6)
+
+old_AA <- small_sample_AA %>%
+  filter(age>=6)
+
+p1 <- ggplot(small_sample_AA, aes(x = ta_proportion)) +
+  geom_bar()+
+  labs(title = "Overall ta_proportion", y = "Count")
+
+eq_a = function(x){0.0001^x}
+eq_b = function(x){exp(x^6)}
+
+exp_a <- ggplot(data.frame(x=c(0,1)), aes(x=x)) + 
+  stat_function(fun=eq_a) +
+  labs(x = "ta_proportion", y = "Predicted count distribution by Rule (a)") +
+theme(axis.text.y = element_blank() )
+
+exp_b <- ggplot(data.frame(x=c(0,1)), aes(x=x)) + 
+  stat_function(fun=eq_b) +
+  labs(x = "ta_proportion", y = "Predicted count distribution by Rule (b)") +
+  theme(axis.text.y = element_blank() )
+
+p2 <- ggplot(young_AA, aes(x = ta_proportion, fill = condition_id)) +
+  geom_bar(width = 0.1) +
+  facet_wrap(~condition_id) +
+  labs(title = "Children younger than 6", y = "Count") +
+  scale_fill_manual(values=c('#FFB646','#00AA9F'))+
+  theme(legend.position = "none") 
+
+p3 <- ggplot(old_AA, aes(x = ta_proportion, fill = condition_id)) +
+  geom_bar(width = 0.1) +
+  facet_wrap(~condition_id) +
+  labs(title = "Children older than 6", y = "Count") +
+  scale_fill_manual(values=c('#FFB646','#00AA9F'))+
+  theme(legend.position = "none") +
+  ylim(0,8)
+
+p1
+  
+exp_a+exp_b
+p2+p3
+```
+
+
+
+
+
+```{r include = F}
+x <-c(0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1)
+y1 <- exp(x^6)
+y2 <- exp(-x^6)
+
+exp_df <- data.frame(x,y1,y2)
+
+p1_exp <- ggplot(exp_df, aes(x = x, y = y2)) +
+  geom_point() +
+  labs(y = "Count", x = "ta_proportion") + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  scale_x_continuous(breaks=seq(0,1,1/7), limits = c(0,1))+
+  labs(title = "Expected ta_proportion for Rule (a)")
+
+p1_exp2 <- ggplot(exp_df, aes(x = x, y = y1)) +
+  geom_point() +
+  labs(y = "Count", x = "ta_proportion") + 
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  scale_x_continuous(breaks=seq(0,1,1/7), limits = c(0,1))+
+  labs(title = "Expected ta_proportion for Rule (b)")
+
+```
+
+```{r bargraph, young/old, condition1/2}
+
+small_sample_AA <- small_sample_AA %>%
+  mutate(young_old = ifelse(age_group == 1 | age_group == 2, 0, 1)) %>%
+  mutate(young_old = as.factor(young_old))
+
+means_AA <- small_sample_AA %>% 
+  group_by(condition_id, young_old) %>% 
+   summarise(mean = mean(ta_proportion),
+             se = sd(ta_proportion) / sqrt(length(ta_proportion)))
+
+# making the plot
+ggplot(means_AA, aes(x=condition_id, y=mean, fill=young_old)) + 
+  geom_bar(stat="identity", 
+           position=position_dodge(), width=0.5) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2,
+                 position=position_dodge(.5)) +
+  ylim(0,1) +
+  geom_hline(yintercept=0.5, linetype='dashed', col = '#005FA7') +
+  labs(x = "Condition", y = "Average ta_proportion", fill = "Children age")+
+  scale_fill_manual(labels = c("Younger than 6", "Older than 6"), values=c('#FFB646','#00AA9F'))
+
+```
+
+```{r young old test}
+wilcox_test(small_sample_AA,ta_proportion~young_old)
+```
+
+```{r young old anova test}
+anova2 <- aov(ta_proportion ~ condition_id * young_old, data = small_sample_AA)
+summary(anova2)
+```
+
+
+
+## Boxplot
+
+```{r item 1-7 ta boxplot}
+ggplot(small_sample_AA, aes(age_group, ta_proportion, fill = age_group))+
+  stat_boxplot(aes(age_group, ta_proportion), 
+    geom='errorbar', linetype=1, width=0.5)+  #whiskers
+  geom_boxplot(aes(age_group, ta_proportion),outlier.shape=8) + 
+  scale_fill_manual(values=c("#FFD08C", "#AD99D7", "#7AAE82","#FFAEAE"))+
+  stat_summary(fun.y=mean, geom="point", size=2) + 
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.3, color = "#DB4642") +
+  facet_wrap(~condition_id) +
+  geom_hline(yintercept=0.5, linetype='dashed', col = '#005FA7') +
+  geom_jitter(color="black", size=1, alpha=0.3, height = 0) +
+  labs(title = "percentage of answering 'ta' in first seven items", subtitle = "separated by condition", x = "Age group")  +
+  theme(legend.position = "none")
+```
+
+
+
+```{r item 1-7 pi boxplot, include = F}
+ggplot(small_sample_AA, aes(age_group, pi_proportion))+
+  stat_boxplot(aes(age_group, pi_proportion), 
+    geom='errorbar', linetype=1, width=0.5)+  #whiskers
+  geom_boxplot(aes(age_group, pi_proportion),outlier.shape=8) +    
+  stat_summary(fun.y=mean, geom="point", size=2) + 
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.3, color = "red") +
+  facet_wrap(~condition_id) +
+  geom_hline(yintercept=0.5, linetype='dotted', col = 'blue') +
+  geom_jitter(color="black", size=1, alpha=0.3, height = 0) +
+  labs(title = "percentage of answering 'pi' in first seven items", subtitle = "separated by condition")
+```
+
+
+
+
+## Interaction Plot
+
+
+```{r interaction plot}
+ggplot(small_sample_AA, aes(x=age, y=ta_proportion, shape=condition_id, color=condition_id)) +
+  geom_point()+
+  geom_smooth(method=lm,aes(fill=condition_id), level = 0.95) +
+  labs(x = "Age") +
+  scale_fill_manual(values=c("#FFB646", "#00AA9F")) +
+  scale_color_manual(values=c("#FFB646", "#00AA9F")) +
+  guides(col=guide_legend("Condition"),
+         shape = guide_legend("Condition"),
+         fill = guide_legend("Condition"))
+  
+```
+
+## Regression
+
+A regression to see if there's an interaction between age (continuous) and condition_id: 
+
+```{r regession age*condition}
+lm1<-lm(ta_proportion~age*relevel(condition_id, ref = "2"),data=small_sample_AA)
+summary(lm1)
+```
+
+
+There is an interaction between age and condition_id! But R^2 is small. 
+
+
+
+Check the regression assumptions
+
+```{r residual plot}
+plot(predict(lm1),resid(lm1),col="midnightblue",pch=18,main="Residual plot")
+abline(0,0,col="red")
+```
+
+```{r normal Q-Q plot}
+qqnorm(resid(lm1),pch=19)
+qqline(resid(lm1),col="red")
+```
+
+```{r regression shapiro}
+shapiro.test(resid(lm1))
+```
+
+```{r, include = F}
+lm2<-lm(ta_proportion~age_group*condition_id,data=small_sample_AA)
+summary(lm2)
+```
+
+
+## ANOVA
+
+Condition by age group
+
+
+```{r ANOVA condition*age group}
+anova1 <- aov(ta_proportion ~ condition_id * age_group, data = small_sample_AA)
+summary(anova1)
+```
+
+
+
+## Non-parametric tests
+
+### ta_proportion ~ Condition
+
+independent 2-group Mann-Whitney U Test: 
+Is ta_proportion different in Condition 1 vs. Condition 2 for items 1-7
+
+```{r ta_proportion ~ condition}
+wilcox_test(small_sample_AA,ta_proportion~condition_id)
+```
+
+### ta_proportion ~ age group
+
+Kruskal Wallis Test One Way Anova by Ranks:
+
+Is ta_proportion different among age groups
+
+```{r ta_proportion ~ age groups}
+kruskal.test(small_sample_AA$ta_proportion~small_sample_AA$age_group)
+```
+
+No effect of age group.
+
+
+## Hypothesis testing
+
+### Do children use the Tolerance Principle?
+
+#### Prediction
+
+ta_proportion is not significantly different from 0 or 1.
+
+test normality:
+```{r shapiro ta_proportion}
+shapiro.test(small_sample_AA$ta_proportion)
+```
+
+Not normal!! Cannot use t-test; non-parametric tests instead.
+
+#### Compare ta_proportion with 0 and 1
+
+
+```{r item 1-7 TP}
+wilcox.test(small_sample_AA$ta_proportion, mu = 1, alternative = "two.sided")
+wilcox.test(small_sample_AA$ta_proportion, mu = 0, alternative = "two.sided")
+```
+
+ta_proportion is not significantly different from 1 nor 0. (Not what I wish to see!)
+
+#### Compare ta_proportion with 0.5
+
+Are they choosing randomly (i.e. is it different from 0.5?)
+
+```{r item 1-7 0.5}
+wilcox.test(small_sample_AA$ta_proportion, mu = 0.5, alternative = "two.sided")
+```
+
+ta_proportion is not significantly different from 0.5. 
+
+
+#### Do children use separate rules?
+
+Maybe children have separate rules learned?
+
+```{r filter by ta_proportion}
+# Filter out children who choose pi_proportion >= 0.5
+
+large_pi_AA <- small_sample_AA %>%
+  filter(pi_proportion >= 0.5)
+
+# Filter out children who choose pi_proportion <= 0.5
+
+small_pi_AA <- small_sample_AA %>%
+  filter(pi_proportion <= 0.5)
+
+nrow(large_pi_AA) # small ta
+nrow(small_pi_AA) # large ta
+
+```
+
+
+
+Do the non-parametric test (and t-test) again: 
+
+```{r item 1-7 TP test filtered by ta_proportion}
+wilcox.test(large_pi_AA$ta_proportion, mu = 0, alternative = "two.sided")
+wilcox.test(small_pi_AA$ta_proportion, mu = 1, alternative = "two.sided")
+t.test(small_pi_AA$ta_proportion, mu = 1, alternative = "two.sided")
+t.test(small_pi_AA$ta_proportion, mu = 1, alternative = "two.sided")
+```
+
+
+```{r include = F}
+consistent_AA <- small_sample_AA %>%
+  filter(ta_proportion > 0.7 | ta_proportion < 0.3)
+```
+
+
+### Do children use probability matching? 
+
+#### Are they significantly different from token frequency?
+1: 0.57 ta
+2: 0.74 ta
+
+```{r item 1-7 PM}
+AA_condition1 <- small_sample_AA %>% filter(condition_id == "1") 
+AA_condition2 <- small_sample_AA %>% filter(condition_id == "2") 
+wilcox.test(AA_condition1$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(AA_condition2$ta_proportion, mu = 0.74, alternative = "two.sided")
+t.test(AA_condition1$ta_proportion, mu = 0.57, alternative = "two.sided")
+t.test(AA_condition2$ta_proportion, mu = 0.74, alternative = "two.sided")
+```
+Condition 2 significantly different from probability; but Condition 1 is not.
+
+
+#### Are they significantly different from 0.5?
+
+```{r item 1-7 condition chance}
+wilcox.test(AA_condition1$ta_proportion, mu = 0.5, alternative = "two.sided")
+wilcox.test(AA_condition2$ta_proportion, mu = 0.5, alternative = "two.sided")
+```
+
+No, ta_proportion is not significantly different from chance. 
+
+## Do younger children differ from older children?
+
+Maybe, older children use more probability matching. 
+
+```{r young old item1-7 PM}
+
+
+young_condition1 <- young_AA %>% filter(condition_id == "1") 
+young_condition2 <- young_AA %>% filter(condition_id == "2") 
+old_condition1 <- old_AA %>% filter(condition_id == "1") 
+old_condition2 <- old_AA %>% filter(condition_id == "2") 
+wilcox.test(young_condition1$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(young_condition2$ta_proportion, mu = 0.74, alternative = "two.sided")
+wilcox.test(old_condition1$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(old_condition2$ta_proportion, mu = 0.74, alternative = "two.sided")
+```
+
+No. They behaved about the same. 
+
+# Item 8 to 10
+
+## Predictions
+
+**Using the Tolearnce Principle** \
+
+No matter using Rule (a) or Rule (b), should choose ta all the time \
+
+**Using Probability Matching** \
+
+If in Condition 1: use ta 57% of the time \
+If in Condition 2: use ta 74% of the time \
+But they should answer Item 10 the ta marker all the time, because it is a check question.\
+
+**Choosing by chance** \
+
+Choosing ta around 50% of the time. 
+
+
+## Select and wrangle Item 8-10
+
+```{r select and wrangle 8-10}
+small_sample_AB <- small_sample_coded %>%
+  dplyr::select(-c(item1:item7))
+
+small_sample_AB$eight_ten_ta_count <- apply(small_sample_AB, 1, function(x) length(which(x=="ta")))
+
+#small_sample_AB <- row_count(small_sample_AB, count = "ta", append = TRUE)
+small_sample_AB$NA_count <- rowSums(is.na(small_sample_AB))
+
+small_sample_AB <- small_sample_AB %>%
+#  dplyr::rename(eight_ten_ta_count = rowcount) %>%
+  mutate(ta_proportion = (eight_ten_ta_count / 3))
+```
+
+
+## Descrptive stats
+
+```{r item 8-10 descrptive stats}
+tally(small_sample_coded$item8)
+tally(small_sample_coded$item9)
+tally(small_sample_coded$item10)
+
+favstats(ta_proportion ~ condition_id, data = small_sample_AB)
+favstats(ta_proportion ~ age_group, data = small_sample_AB)
+```
+
+## Boxplot
+
+
+```{r item 8-10 ta_proportion boxplot, include = F}
+ggplot(small_sample_AB, aes(age_group, ta_proportion))+
+  stat_boxplot(aes(age_group, ta_proportion), 
+    geom='errorbar', linetype=1, width=0.5)+  #whiskers
+  geom_boxplot(aes(age_group, ta_proportion),outlier.shape=8) +    
+  stat_summary(fun.y=mean, geom="point", size=2) + 
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.3, color = "red") +
+  facet_wrap(~condition_id) +
+  geom_hline(yintercept=1, linetype='dotted', col = 'blue') +
+  geom_jitter(color="black", size=1, alpha=0.3, height = 0) +
+  labs(title = "percentage of answering 'ta' in last three items", subtitle = "separated by condition")
+```
+
+```{r}
+ggplot(small_sample_AB, aes(age_group, ta_proportion, fill = age_group))+
+  stat_boxplot(aes(age_group, ta_proportion), 
+    geom='errorbar', linetype=1, width=0.5)+  #whiskers
+  geom_boxplot(aes(age_group, ta_proportion),outlier.shape=8) + 
+  scale_fill_manual(values=c("#FFD08C", "#AD99D7", "#7AAE82","#FFAEAE"))+
+  stat_summary(fun.y=mean, geom="point", size=2) + 
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.3, color = "#DB4642") +
+  facet_wrap(~condition_id) +
+  geom_hline(yintercept=1, linetype='dashed', col = '#005FA7') +
+  geom_jitter(color="black", size=1, alpha=0.3, height = 0) +
+  labs(title = "percentage of answering 'ta' in last three items", subtitle = "separated by condition", x = "Age group")  +
+  theme(legend.position = "none")
+```
+
+
+## Regression
+
+Does age/condition ID have effect on ta_proportion in Item 8-10?
+
+
+```{r item 8-10 regression ta_proportion~age*condition}
+lm3 <- lm(ta_proportion~age*relevel(condition_id, ref = "2"),data=small_sample_AB)
+summary(lm3) 
+```
+
+## Hypothesis testing
+
+### Do children use the Tolerance Principle?
+
+```{r item 8-10 TP}
+wilcox.test(small_sample_AB$ta_proportion, mu = 1, alternative = "two.sided")
+```
+
+### Do children recognize the difference between AA and AB?
+
+```{r test ta_proportion difference between AA and AB}
+sample_join <-small_sample_AB %>%
+  full_join(small_sample_AA, by = "response__id") %>%
+  dplyr::select(response__id, age_group = age_group.x, AB_ta_proportion = ta_proportion.x, AA_ta_proportion = ta_proportion.y)
+
+wilcox.test(sample_join$AB_ta_proportion, sample_join$AA_ta_proportion, paired = TRUE, alternative = "two.sided")
+```
+
+Not significantly different.
+
+
+### Do children use probability matching?
+
+```{r item 8-10 PM}
+AB_condition1 <- small_sample_AB %>% filter(condition_id == "1") 
+AB_condition2 <- small_sample_AB %>% filter(condition_id == "2") 
+wilcox.test(AB_condition1$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(AB_condition2$ta_proportion, mu = 0.74, alternative = "two.sided")
+wilcox.test(AB_condition1$ta_proportion, mu = 0.5, alternative = "two.sided")
+wilcox.test(AB_condition2$ta_proportion, mu = 0.5, alternative = "two.sided")
+```
+
+Condition 2 significantly different from probability; but Condition 1 is not. Both are not significantly different from chance. 
+
+
+
+```{r item by item, include = F}
+small_sample_all <- small_sample_coded %>%
+  mutate(item1_r = case_when(item1 == "ta" ~ 1,
+                             item1 == "pi" ~ 0),
+         item2_r = case_when(item2 == "ta" ~ 1,
+                             item2 == "pi" ~ 0),
+         item3_r = case_when(item3 == "ta" ~ 1,
+                             item3 == "pi" ~ 0),
+         item4_r = case_when(item4 == "ta" ~ 1,
+                             item4 == "pi" ~ 0),
+         item5_r = case_when(item5 == "ta" ~ 1,
+                             item5 == "pi" ~ 0),
+         item6_r = case_when(item6 == "ta" ~ 1,
+                             item6 == "pi" ~ 0),
+         item7_r = case_when(item7 == "ta" ~ 1,
+                             item7 == "pi" ~ 0),
+         item8_r = case_when(item8 == "ta" ~ 1,
+                             item8 == "pi" ~ 0),
+         item9_r = case_when(item9 == "ta" ~ 1,
+                             item9 == "pi" ~ 0),
+         item10_r = case_when(item10 == "ta" ~ 1,
+                             item10 == "ma" ~ 0),)
+
+all_items_condition <- small_sample_all %>%
+  group_by(condition_id) %>%
+  summarize(item1_mean = mean(item1_r),
+            item2_mean = mean(item2_r),
+            item3_mean = mean(na.omit(item3_r)),
+            item4_mean = mean(item4_r),
+            item5_mean = mean(item5_r),
+            item6_mean = mean(item6_r),
+            item7_mean = mean(na.omit(item7_r)),
+            item8_mean = mean(item8_r),
+            item9_mean = mean(item9_r),
+            item10_mean = mean(item10_r)) %>%
+  pivot_longer(cols = item1_mean:item10_mean,names_to = "item_num", values_to = "item_mean")
+
+ggplot(all_items_condition, aes(x = item_num, y = item_mean, color = condition_id, fill = condition_id)) +
+  geom_col(position=position_dodge(), width = 0.5)
+
+all_items_age <- small_sample_all %>%
+  group_by(age_group) %>%
+  summarize(item1_mean = mean(item1_r),
+            item2_mean = mean(item2_r),
+            item3_mean = mean(na.omit(item3_r)),
+            item4_mean = mean(item4_r),
+            item5_mean = mean(item5_r),
+            item6_mean = mean(item6_r),
+            item7_mean = mean(na.omit(item7_r)),
+            item8_mean = mean(item8_r),
+            item9_mean = mean(item9_r),
+            item10_mean = mean(item10_r))
+```
+
+
+
+# Only children answering Item 10 correctly
+
+How about filtering out children who answered Item 10 incorrectly? \
+Look at their Item1-7 again. 
+
+## Filtering 
+
+```{r filter item10 correct child}
+item10_correct_AA <- small_sample_coded %>%
+  filter(item10 == "ta") %>%
+  select(-c(item8,item9,item10))
+
+item10_correct_AA$one_seven_ta_count <- apply(item10_correct_AA, 1, function(x) length(which(x=="ta")))
+
+#item10_correct_AA <- row_count(item10_correct_AA, count = "ta", append = TRUE)
+item10_correct_AA$NA_count <- rowSums(is.na(item10_correct_AA))
+
+#item10_correct_AA <- item10_correct_AA %>%
+#  dplyr::rename(one_seven_ta_count = rowcount)
+
+item10_correct_AA <- item10_correct_AA %>%
+  mutate(ta_proportion = one_seven_ta_count/(7-NA_count)) %>%
+  mutate(pi_proportion = (7-NA_count-one_seven_ta_count)/(7-NA_count))
+  
+```
+
+
+```{r filter item10 wrong child}
+item10_wrong_AA <- small_sample_coded %>%
+  filter(item10 != "ta") %>%
+  select(-c(item8,item9,item10))
+
+item10_wrong_AA$one_seven_ta_count <- apply(item10_wrong_AA, 1, function(x) length(which(x=="ta")))
+
+#item10_wrong_AA <- row_count(item10_wrong_AA, count = "ta", append = TRUE)
+item10_wrong_AA$NA_count <- rowSums(is.na(item10_wrong_AA))
+
+#item10_wrong_AA <- item10_wrong_AA %>%
+#  dplyr::rename(one_seven_ta_count = rowcount)
+
+item10_wrong_AA <- item10_wrong_AA %>%
+  mutate(ta_proportion = one_seven_ta_count/(7-NA_count)) %>%
+  mutate(pi_proportion = (7-NA_count-one_seven_ta_count)/(7-NA_count))
+  
+```
+
+```{r, include = F}
+ggplot(item10_wrong_AA, aes(x = ta_proportion)) +
+  geom_bar() +
+  facet_wrap(~condition_id)
+```
+
+```{r include = F}
+ggplot(item10_correct_AA, aes(x = ta_proportion)) +
+  geom_bar() +
+  facet_wrap(~condition_id)
+```
+
+## Hypothesis testing
+
+### Are they using the Tolerance Principle?
+
+
+```{r item10 child TP}
+wilcox.test(item10_correct_AA$ta_proportion, mu = 1, alternative = "two.sided")
+wilcox.test(item10_correct_AA$ta_proportion, mu = 0, alternative = "two.sided")
+wilcox.test(item10_correct_AA$ta_proportion, mu = 0.5, alternative = "two.sided")
+t.test(item10_correct_AA$ta_proportion, mu = 1, alternative = "two.sided")
+t.test(item10_correct_AA$ta_proportion, mu = 0, alternative = "two.sided")
+```
+
+No, and still not significantly different from chance.
+
+
+
+
+### Are they using probability matching?
+
+
+```{r item10 correct child PM}
+AA_condition1_correct <- item10_correct_AA %>% filter(condition_id == "1") 
+AA_condition2_correct <- item10_correct_AA %>% filter(condition_id == "2") 
+wilcox.test(AA_condition1_correct$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(AA_condition1_correct$ta_proportion, mu = 0.5, alternative = "two.sided")
+wilcox.test(AA_condition2_correct$ta_proportion, mu = 0.74, alternative = "two.sided")
+t.test(AA_condition1_correct$ta_proportion, mu = 0.57, alternative = "two.sided")
+t.test(AA_condition2_correct$ta_proportion, mu = 0.74, alternative = "two.sided")
+```
+
+### Is condition 1 different from condition 2, for children who answered item 10 correctly?
+
+```{r}
+wilcox.test(item10_correct_AA$ta_proportion~item10_correct_AA$condition_id)
+t.test(item10_correct_AA$ta_proportion~item10_correct_AA$condition_id)
+```
+
+No they are not significantly different from each other. 
+
+### Is there difference between young & old children for item 1-7 ta_proportion (for those item 10 is correct)?
+
+#### Filter
+
+```{r filter young old children item10 correct}
+item10_correct_AA_young <- item10_correct_AA %>%
+  filter(age<6)
+
+item10_correct_AA_old <- item10_correct_AA %>%
+  filter(age>=6)
+```
+
+#### Test probability matching
+
+```{r item10 correct PM}
+young_condition1_correct <- item10_correct_AA_young %>% filter(condition_id == "1") 
+young_condition2_correct <- item10_correct_AA_young %>% filter(condition_id == "2") 
+old_condition1_correct <- item10_correct_AA_old %>% filter(condition_id == "1") 
+old_condition2_correct <- item10_correct_AA_old %>% filter(condition_id == "2") 
+wilcox.test(young_condition1_correct$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(young_condition2_correct$ta_proportion, mu = 0.74, alternative = "two.sided")
+wilcox.test(old_condition1_correct$ta_proportion, mu = 0.57, alternative = "two.sided")
+wilcox.test(old_condition2_correct$ta_proportion, mu = 0.74, alternative = "two.sided")
+wilcox.test(old_condition1_correct$ta_proportion, mu = 0.5, alternative = "two.sided")
+```
+
+
+Similar results. They still answered by chance. 
+
+
+
+
+
+
+
+
+
+How many children choose categorically?
+
+```{r}
+small_sample_AA %>%
+  filter(ta_proportion == 1 | ta_proportion == 0) %>%
+  summarize(n = n())
+```
+

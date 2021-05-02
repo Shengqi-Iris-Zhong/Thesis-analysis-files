@@ -1,0 +1,133 @@
+---
+title: "data_wrangling_lookit"
+author: "Iris Zhong"
+date: "3/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(plyr)
+library(tidyverse)
+library(readr)
+
+```
+
+
+```{r load all datasets}
+temp <- list.files(pattern="*.csv")
+myfiles <- lapply(temp, read.csv)
+newfiles <- vector(mode = "list") # empty list
+
+```
+
+```{r load info dataset}
+
+info_data <-  read_csv("C:/Users/iris_/OneDrive/Desktop/Smith/Honor thesis/Participant/4.3 participant.csv") %>%
+  dplyr::rename(child_hashed_id = child__hashed_id )
+```
+
+
+```{r only select completed response}
+i <- 1
+
+for (goodfiles in myfiles) {
+  
+  isExitEarly <- slice(goodfiles,2)$value # R2 of incomplete response is "exitEarly"
+  childtempid <- slice(goodfiles,2)$child_hashed_id
+  if (isExitEarly != "exitEarly" | childtempid == "HDZFU3" |childtempid =="SWMUXF" |childtempid =="KA2QdY") {
+   #newfiles = newfiles[-badfile]
+   #newfiles[i] <- NULL
+    newfiles[[i]] <- goodfiles # add complete response to newfiles list
+    i <- i+1
+  }
+  
+  
+}
+```
+
+
+
+```{r create empty data frame}
+
+final_df <- data.frame(child_hashed_id = character(),
+                       item1 = character(),
+                       item2 = character(),
+                       item3 = character(),
+                       item4 = character(),
+                       item5 = character(),
+                       item6 = character(),
+                       item7 = character(),
+                       item8 = character(),
+                       item9 = character(),
+                       item10 = character(),
+                       condition_id = character())
+
+```
+
+
+
+```{r clean data function}
+clean_function <- function(data, final_df){
+  data_1 <- data %>%
+  # responses in frame_id containing "test-trial", event number = 6, and key = imageId
+  filter(stringr::str_detect(frame_id, 'test-trial'),
+          event_number == 6,
+          key == "imageId") 
+  item_num <- parse_number(data_1$value) # parse number from response
+item_rp <- str_replace_all(data_1$value, "[:digit:]", "") # parse left/right from response
+
+
+data_2 <- data_1 %>%
+  add_column(item_num) %>% # add item number to dataset
+  add_column(item_rp) %>%
+  select(child_hashed_id, item_num, item_rp) %>%
+  arrange(item_num) %>% # arrange the order with item number
+  pivot_wider(names_from = item_num, names_prefix = "item", values_from = item_rp) # pivot wider so that one row per child
+
+data_3 <- data %>%
+  filter(stringr::str_detect(frame_id, '34')) %>% # 34 is a random frame
+  head (1)
+
+data_4 <- data_3 %>%
+  mutate(condition_id =ifelse(nrow(data_3)!=0, str_split(frame_id, "-")[[1]][2], "incomplete")) %>% # find condition id
+  select(condition_id)
+
+  
+final_data <- data_2 %>%
+  add_column(data_4$condition_id) %>%
+  dplyr::rename(condition_id = `data_4$condition_id`)
+
+final_df <- final_df %>%
+  rbind.fill(final_data)
+  
+}
+```
+
+
+```{r clean data}
+# clean all complete responses in a for loop
+for (j in newfiles) {
+  final_df <- clean_function(j, final_df)
+
+}
+```
+
+```{r join dataset}
+# join by info dataset
+final_df <- final_df %>%
+  full_join(info_data, by = "child_hashed_id" ) %>%
+  select(child_hashed_id, response__id, child__age_rounded, response__birthdate_difference, response__completed,response__is_preview, item1, item2, item3, item4, item5, item6, item7, item8, item9, item10, condition_id)
+```
+
+
+```{r export dataset}
+#write.csv(final_df,"C:/Users/iris_/OneDrive/Desktop/Smith/Honor #thesis/Learn-an-alien-language-_framedata_per_session_328/data_all_child.csv", row.names = FALSE)
+```
+
+```{r}
+#library("writexl")
+#write_xlsx(final_df,"C:/Users/iris_/OneDrive/Desktop/Smith/Honor #thesis/Learn-an-alien-language-_43/data_with_id.xlsx")
+```
+
+
